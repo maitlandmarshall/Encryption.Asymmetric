@@ -48,6 +48,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MnemonicTests.cs" />
     <Compile Include="RSAKeyPairTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

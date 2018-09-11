@@ -8,10 +8,49 @@ namespace Encryption.Asymmetric
 {
     public class RSAKeyPair : IKeyPair, IDisposable
     {
-        public int KeySize { get; private set; } = 512;
+        const int DefaultKeySize = 512;
 
-        public byte[] PrivateKey { get; private set; }
-        public byte[] PublicKey { get; private set; }
+        public int KeySize { get; private set; } = DefaultKeySize;
+
+        private byte[] _privateKey;
+        public byte[] PrivateKey
+        {
+            get
+            {
+                if (this._privateKey == null)
+                {
+                    RSAParameters paras = this.RSA.ExportParameters(true);
+
+                    // PrivateKey Segments
+                    this._privateKey = paras.Modulus // [KeySize / 8]
+                        .Concat(paras.Exponent) // 3
+                        .Concat(paras.P) // [KeySize / 16]
+                        .Concat(paras.Q) // [KeySize / 16]
+                        .Concat(paras.DP) // [KeySize / 16]
+                        .Concat(paras.DQ) // [KeySize / 16]
+                        .Concat(paras.InverseQ) // [KeySize / 16]
+                        .Concat(paras.D) // [KeySize / 8]
+                        .ToArray();
+                }
+
+                return this._privateKey;
+            }
+            private set
+            {
+                this._privateKey = value;
+            }
+        }
+
+        public byte[] PublicKey
+        {
+            get
+            {
+                if (this.PrivateKey == null)
+                    throw new Exception("PrivateKey must not be null");
+
+                return this.PrivateKey.Take(this.KeySize / 8 + 3).ToArray();
+            }
+        }
 
         protected RSAParameters RSAParams
         {
@@ -64,32 +103,30 @@ namespace Encryption.Asymmetric
             }
         }
 
-        public string Mnemonic => throw new NotImplementedException();
-
-        public RSAKeyPair()
+        public string Mnemonic
         {
-            RSAParameters paras = this.RSA.ExportParameters(true);
+            get
+            {
+                if (this.PrivateKey == null)
+                    return null;
 
-            // PublicKey Segments
-            // Modulas = [KeySize / 8] Exponent = [3]
-            this.PublicKey = paras.Modulus.Concat(paras.Exponent).ToArray();
-
-            // PrivateKey Segments
-            this.PrivateKey = this.PublicKey
-                .Concat(paras.P) // [KeySize / 16]
-                .Concat(paras.Q) // [KeySize / 16]
-                .Concat(paras.DP) // [KeySize / 16]
-                .Concat(paras.DQ) // [KeySize / 16]
-                .Concat(paras.InverseQ) // [KeySize / 16]
-                .Concat(paras.D) // [KeySize / 8]
-                .ToArray();
+                return Asymmetric.Mnemonic.Encode(this.PrivateKey);
+            }
         }
 
-        public RSAKeyPair(byte[] privateKey)
+        public RSAKeyPair() { }
+
+        public RSAKeyPair(int keySize = DefaultKeySize)
+        {
+            if (keySize % 8 != 0)
+                throw new ArgumentException("keySize must be a multiple of 8");
+
+            this.KeySize = keySize;
+        }
+
+        public RSAKeyPair(byte[] privateKey, int keySize = DefaultKeySize) : this(keySize)
         {
             this.PrivateKey = privateKey;
-            this.PublicKey = this.PrivateKey.Take(KeySize / 8 + 3).ToArray();
-
             this.RSA.ImportParameters(this.RSAParams);
         }
 
